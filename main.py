@@ -2,7 +2,7 @@ import os
 import uuid
 import uvicorn
 import shutil
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
@@ -26,7 +26,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.post("/extract", response_model=BloodReportExtraction)
+async def verify_api_key(x_api_key: str = Header(None)):
+    expected_api_key = os.getenv("APP_API_KEY")
+    if not expected_api_key:
+        raise HTTPException(status_code=500, detail="Server APP_API_KEY not configured in environment.")
+    if x_api_key != expected_api_key:
+        raise HTTPException(status_code=401, detail="Invalid API Key provided.")
+
+@app.post("/extract", response_model=BloodReportExtraction, dependencies=[Depends(verify_api_key)])
 async def extract_report(file: UploadFile = File(...)):
     """
     Accepts a PDF upload, extracts blood report data via Gemini, 
